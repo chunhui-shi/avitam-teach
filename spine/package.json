@@ -22,7 +22,8 @@
     "react": "^18",
     "react-dom": "^18",
     "stripe": "^22.0.1",
-    "vm2": "^3.10.5"
+    "vm2": "^3.10.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^20",

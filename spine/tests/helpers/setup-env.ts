@@ -19,6 +19,11 @@ process.env.STRIPE_WEBHOOK_SECRET =
 process.env.ANTHROPIC_API_KEY =
   process.env.ANTHROPIC_API_KEY || 'sk-ant-placeholder';
 
+// v2-deployed: src/lib/env.ts requires NEXT_PUBLIC_APP_URL as a valid URL.
+// Provide a localhost placeholder so the env validation passes under test.
+process.env.NEXT_PUBLIC_APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
 // Force a clean process exit once vitest's own event loop winds down. The
 // src/lib/db.ts pool holds idle TCP connections that would otherwise keep the
 // node event loop alive and stall the test runner. We can't safely `.end()`

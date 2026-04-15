@@ -1,0 +1,21 @@
+# v2-deployed: keep the Docker build context small and reproducible.
+node_modules
+.next
+.git
+.gitignore
+tests
+coverage
+*.log
+npm-debug.log*
+.env
+.env.local
+.env.docker
+.env.*.local
+.DS_Store
+README.md
+GENERATION_NOTES.md
+CLAUDE.md
+Dockerfile
+docker-compose.yml
+.dockerignore
+.github

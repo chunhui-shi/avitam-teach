@@ -3,6 +3,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import { queryOne } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { Lesson, Enrollment } from '@/types';
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitExceededResponse,
+  RATE_LIMITS,
+} from '@/lib/rate-limit';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -16,6 +22,13 @@ export async function POST(
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // v2-deployed: per-user rate limit (20 req/min), falls back to per-IP.
+    const identifier = session ? `user:${session.userId}` : getClientIp(req);
+    const rl = checkRateLimit(RATE_LIMITS.assistant, identifier);
+    if (!rl.allowed) {
+      return rateLimitExceededResponse(rl.retryAfterSeconds);
     }
 
     const courseId = parseInt(params.courseId);
@@ -79,11 +92,25 @@ Your role:
 - If asked about unrelated topics, gently redirect to the lesson material
 - Keep responses focused and under 300 words unless a longer explanation is truly needed`;
 
-    // Build message history (last 6 turns max to keep context manageable)
-    const messageHistory = Array.isArray(history) ? history.slice(-6) : [];
+    // Build message history (last 6 turns max to keep context manageable).
+    // v1-tested fix for Known Issue #5: whitelist role ∈ {user, assistant}.
+    // The client may NOT inject role: "system" entries — those would
+    // override the server's system prompt and bypass the teaching guardrails.
+    const rawHistory: unknown[] = Array.isArray(history) ? history : [];
+    const messageHistory = rawHistory
+      .filter(
+        (m): m is { role: 'user' | 'assistant'; content: string } =>
+          typeof m === 'object' &&
+          m !== null &&
+          (('role' in m && ((m as { role: unknown }).role === 'user' ||
+            (m as { role: unknown }).role === 'assistant'))) &&
+          'content' in m &&
+          typeof (m as { content: unknown }).content === 'string'
+      )
+      .slice(-6);
     const messages: Anthropic.MessageParam[] = [
-      ...messageHistory.map((m: { role: string; content: string }) => ({
-        role: m.role as 'user' | 'assistant',
+      ...messageHistory.map((m) => ({
+        role: m.role,
         content: m.content,
       })),
       { role: 'user', content: sanitizedQuestion },

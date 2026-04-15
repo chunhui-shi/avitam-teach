@@ -38,8 +38,13 @@ export async function GET(
       }
     }
 
+    // v1-tested fix for Known Issue #3: explicit column list so code_solution
+    // never leaves the server. The client needs starter code and lesson
+    // metadata; the solution is the answer key and must stay private.
     const lesson = await queryOne<Lesson>(
-      'SELECT * FROM lessons WHERE id = $1 AND course_id = $2',
+      `SELECT id, course_id, title, slug, position, content, lesson_type,
+              quiz_data, code_starter, code_language, created_at
+       FROM lessons WHERE id = $1 AND course_id = $2`,
       [lessonId, courseId]
     );
 

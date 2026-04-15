@@ -2,8 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { hashPassword, signToken, createSessionCookie } from '@/lib/auth';
 import { User } from '@/types';
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitExceededResponse,
+  RATE_LIMITS,
+} from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
+  // v2-deployed: per-IP rate limit (5 req/min). See src/lib/rate-limit.ts.
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(RATE_LIMITS.authRegister, ip);
+  if (!rl.allowed) {
+    return rateLimitExceededResponse(rl.retryAfterSeconds);
+  }
+
   try {
     const { name, email, password } = await req.json();
 

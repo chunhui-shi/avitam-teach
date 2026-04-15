@@ -1,0 +1,91 @@
+# v2-deployed CI workflow for avitam-teach.
+#
+# Runs on every push and pull request. Gates merges on lint, type-check,
+# tests (against a real Postgres service container), and a production
+# build. No deployment step — that lives elsewhere (or nowhere; v2 is
+# "shippable to staging", not "auto-deploys to staging").
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: avitam
+          POSTGRES_PASSWORD: avitam
+          POSTGRES_DB: avitam_teach_v1_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U avitam -d avitam_teach_v1_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      # Matches tests/helpers/test-db.ts default.
+      DATABASE_URL: postgresql://avitam:avitam@localhost:5432/avitam_teach_v1_test
+      # Required by src/lib/env.ts. Test placeholders — real secrets live in
+      # GitHub Actions secrets for deploy workflows, which v2 does not define.
+      JWT_SECRET: ci-test-jwt-secret-placeholder-minimum-32-chars
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+      ANTHROPIC_API_KEY: sk-ant-placeholder
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 18.20.8
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.20.8
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U avitam -d avitam_teach_v1_test; then
+              echo "postgres is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "postgres did not become ready in time" >&2
+          exit 1
+
+      - name: Run tests
+        # The v1-tested test suite includes known-issue proofs that fail on
+        # purpose (see spine/CLAUDE.md). On v2-deployed the env-validation
+        # fix and the v1 fixes should pass; the vm-escape test (Known
+        # Issue #2) is still expected to fail. A real team would fix it and
+        # un-mark it.
+        run: npm test
+
+      - name: Build
+        env:
+          # `next build` needs all env vars that src/lib/env.ts requires.
+          DATABASE_URL: postgresql://avitam:avitam@localhost:5432/avitam_teach_v1_test
+        run: npm run build

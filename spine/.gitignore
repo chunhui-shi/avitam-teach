@@ -27,6 +27,8 @@ yarn-error.log*
 
 # local env files
 .env*.local
+# v2-deployed: docker runtime env (contains real secrets). Example is checked in.
+.env.docker
 
 # vercel
 .vercel

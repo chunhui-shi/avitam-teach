@@ -1,0 +1,50 @@
+# v2-deployed local stack.
+#
+# Usage:
+#   cp .env.docker.example .env.docker
+#   # edit .env.docker to fill in real values (at minimum JWT_SECRET)
+#   docker compose up --build
+#
+# This is the staging-shaped stack — a single app process plus a single
+# postgres instance. No reverse proxy, no TLS, no replication, no secrets
+# manager. That is v3-secured / v4-designed territory, not v2.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: avitam_teach_db
+    restart: unless-stopped
+    # docker-compose substitutes these from .env in the project root (NOT
+    # .env.docker, which is app-container only). Defaults below keep the
+    # stack runnable for a first-time `docker compose up` before the
+    # operator has created .env.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-avitam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme-in-dev}
+      POSTGRES_DB: ${POSTGRES_DB:-avitam_teach}
+    ports:
+      - "5432:5432"
+    volumes:
+      - avitam_teach_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: avitam_teach_app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    ports:
+      - "3000:3000"
+
+volumes:
+  avitam_teach_pgdata:
