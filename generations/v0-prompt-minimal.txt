@@ -1,0 +1,32 @@
+avitam-teach v0 — feature-first prompt (minimal variant)
+
+This is the deliberately-minimal prompt used for Run 3 (and subsequent
+early-career-engineer-style runs). It is the prompt a reader of the book
+would realistically type into Claude / Gemini / Cursor when they want
+a teaching-platform MVP and haven't done a schema or API design first.
+
+Compared to v0-prompt-detailed.txt, this variant:
+
+  - Drops the 6-table schema
+  - Drops the 11 API route list
+  - Drops the explicit out-of-scope list (tests, Docker, CI, rate limit,
+    secrets, sanitization, error handling, grading)
+  - Drops "Ship fast" and "MVP quality, not production-hardened" —
+    those are editorial framings that pre-commit the model to a lower
+    quality bar, which a real early-career user would not write.
+  - Keeps "MVP" as a normal word a real user might use
+  - Keeps "Next.js 14 + Postgres" as a stack nudge, because real users
+    typically have a stack preference
+  - Keeps "powered by Claude" to preserve cross-run comparability of
+    the /api/assistant flaw class
+
+Paste everything below the line into the target AI interface.
+
+================================================================================
+
+Build an MVP of a subscription-based online teaching platform for coding
+courses. Users sign up, browse courses, enroll (free or paid via Stripe),
+and work through lessons containing a mix of text, multiple-choice quizzes,
+and runnable JavaScript code exercises. Each lesson has an AI teaching
+assistant powered by Claude that can answer student questions about that
+lesson. Use Next.js 14 and Postgres.

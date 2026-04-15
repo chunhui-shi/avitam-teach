@@ -1,0 +1,177 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+enum LessonType {
+  TEXT
+  MCQ
+  CODE
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          Role      @default(STUDENT)
+  accounts      Account[]
+  sessions      Session[]
+  
+  purchases     Purchase[]
+  subscriptions Subscription[]
+  progress      UserProgress[]
+  enrollments   Enrollment[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?  @db.Text
+  price       Float?
+  thumbnail   String?
+  isPublished Boolean  @default(false)
+  
+  lessons     Lesson[]
+  purchases   Purchase[]
+  enrollments Enrollment[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Lesson {
+  id          String     @id @default(cuid())
+  courseId    String
+  course      Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  slug        String
+  content     String?    @db.Text
+  order       Int
+  type        LessonType @default(TEXT)
+  
+  mcq         MCQ?
+  codeExercise CodeExercise?
+  progress    UserProgress[]
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([courseId, slug])
+}
+
+model MCQ {
+  id            String @id @default(cuid())
+  lessonId      String @unique
+  lesson        Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  question      String @db.Text
+  options       Json   // Array of strings or {id, text}
+  correctIndex  Int
+}
+
+model CodeExercise {
+  id           String @id @default(cuid())
+  lessonId     String @unique
+  lesson       Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  starterCode  String @db.Text
+  testCode     String @db.Text
+  solution     String @db.Text
+}
+
+model Purchase {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  stripeSessionId String?
+  
+  createdAt       DateTime @default(now())
+}
+
+model Subscription {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeSubscriptionId String   @unique
+  status               String
+  currentPeriodEnd     DateTime
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Enrollment {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
+
+model UserProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+
+  @@unique([userId, lessonId])
+}

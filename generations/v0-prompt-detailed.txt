@@ -1,0 +1,93 @@
+avitam-teach v0 — feature-first prompt (detailed variant)
+
+This is the canonical detailed prompt used for Run 1 (Claude) and Run 2 (Gemini).
+Run 3 uses a deliberately high-level variant saved separately.
+
+Paste everything below the line into the target AI interface (Gemini CLI, Claude
+Code, Claude web, etc.). If the interface has a working-directory concept, make
+sure it points to an empty directory before pasting.
+
+================================================================================
+
+Build an MVP of a subscription-based online teaching platform called
+avitam-teach. The product is a web app where users enroll in courses, work
+through lessons that mix prose, multiple-choice quizzes, and runnable
+JavaScript code exercises, and can ask a per-lesson AI teaching assistant
+questions as they go.
+
+FEATURES (all required in v0)
+
+1. Email + password sign up / log in / log out.
+2. Browse course catalog. Courses are free or paid (price_cents, is_free).
+3. Enroll in a course. Free courses instantly. Paid courses via Stripe test
+   mode.
+4. Courses contain modules; modules contain lessons; lessons contain blocks:
+   - text    — markdown/prose and static code snippets
+   - codebox — student edits JavaScript, presses Run, sees stdout/stderr
+     inline
+   - quiz    — multiple-choice with simple answer matching
+5. Student can mark a lesson complete and view progress across enrolled
+   courses.
+6. Per-lesson AI teaching assistant. POST to /api/assistant with lesson_id
+   and user question → call Anthropic Claude API with lesson content as
+   context → return the answer.
+
+STACK (required)
+
+- Next.js 14 App Router + TypeScript + Tailwind
+- PostgreSQL 16 + Drizzle ORM
+- NextAuth v5 with credentials provider
+- Stripe test mode
+- Anthropic Claude API for the assistant route
+- Code runner: Node's built-in vm.runInNewContext (simplest possible)
+
+SCHEMA (target: 6 tables)
+
+users         — id, email, password_hash, tier, created_at
+courses       — id, slug, title, description, price_cents, is_free
+modules       — id, course_id, title, position
+lessons       — id, module_id, title, position, blocks (JSONB)
+enrollments   — id, user_id, course_id, tier, created_at
+payments      — id, user_id, course_id, amount_cents, provider, status,
+                external_id
+
+API ROUTES
+
+POST  /api/auth/signup, /login, /logout
+GET   /api/courses, /api/courses/:slug, /api/lessons/:id
+POST  /api/enroll, /api/payments/webhook
+POST  /api/codebox/run
+POST  /api/lessons/:id/complete, /api/assistant
+GET   /api/me/progress
+
+SEED DATA
+
+One course: "Modern JavaScript Fundamentals". 3–5 modules, 8–12 lessons
+total. Mix text, codebox, and quiz blocks. Seed via a fixture script.
+
+SCOPE — EXPLICITLY OUT OF SCOPE FOR THIS PASS
+
+- Automated tests
+- Dockerfile, docker-compose, or any deployment configuration
+- CI workflows
+- Rate limiting
+- Secret management beyond .env.local
+- Security audit or input sanitization beyond framework defaults
+- Production-grade error handling
+- Multi-file code exercises or automated grading
+
+Build the MVP end-to-end. Iterate until `npm run build` passes with zero
+errors. Postgres is installed locally; assume a DB URL like
+postgresql://localhost:5432/avitam_teach in .env.local. Do not use Docker.
+The database does not need to exist for the build to pass — only for the dev
+server to run.
+
+When you're done, write a short GENERATION_NOTES.md in the same directory
+recording the key technical decisions you made: password hashing approach,
+how the codebox runner is implemented, how the assistant route is wired
+(what context you send to Claude, any length caps), how you handle the
+Stripe webhook, how enrollment handles the already-enrolled case, how the
+quiz answer is represented in the lesson blocks JSON, and where secrets
+live. Keep it factual, not a self-audit.
+
+Ship fast. Features first; hardening comes later.
