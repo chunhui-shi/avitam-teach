@@ -12,7 +12,7 @@ The full research log, including the four independent AI-generated v0 variants a
 
 - **Framework:** Next.js 14 App Router + TypeScript + Tailwind CSS
 - **Database:** PostgreSQL, accessed through the raw `pg` driver (no ORM). Schema lives in `src/lib/schema.sql`.
-- **Auth:** hand-rolled in `src/lib/auth.ts` — `bcryptjs` cost factor 12, JWT HS256 signed with `jsonwebtoken` (NOT `jose` — an earlier draft of this doc said `jose`; the actual dependency is `jsonwebtoken`). Exported helpers are `hashPassword`, `verifyPassword`, `signToken`, `verifyToken`, `getSession`, `createSessionCookie`. httpOnly / sameSite=lax cookies under the name `avitam_session`.
+- **Auth:** hand-rolled in `src/lib/auth.ts` — `bcryptjs` cost factor 12, JWT HS256 signed with `jsonwebtoken` (NOT `jose` — an earlier draft of this doc said `jose`; the actual dependency is `jsonwebtoken`). Exported helpers are `hashPassword`, `verifyPassword`, `signToken`, `verifyToken`, `getSession`, `createSessionCookie`. Session cookie: httpOnly + sameSite=**strict** (v3-secured; previously lax) + secure:true in production + `__Host-avitam_session` name in production / `avitam_session` in dev/test.
 - **Payments:** Stripe test mode, with webhook signature verification via `stripe.webhooks.constructEvent`.
 - **AI assistant:** direct Anthropic SDK call from one route (`src/app/api/courses/[courseId]/lessons/[lessonId]/ai-assistant/route.ts`).
 - **Runtime:** Node 18.20.8.
@@ -55,11 +55,15 @@ Routes that deviate from this shape are either (a) fixing a known issue, (b) add
 - **Environment.** All secrets in `.env.local` (gitignored). `.env.example` documents required variables. The build should not require real secrets — placeholder values should let `npm run build` pass.
 - **Types.** Shared types live in `src/types/index.ts`. Prefer importing from there over redeclaring inline interfaces.
 
-## Known issues (remaining after v2-deployed)
+## Known issues (remaining after v3-secured)
 
 The following issues are **still deliberately present** in the current state of the codebase because later book chapters need them as teaching material. **Do NOT "helpfully" fix them when making changes.**
 
-2. **Server-side vm execution.** `src/app/api/execute/route.ts` uses `vm.runInNewContext(code, sandbox, { timeout: 3000 })` with a console-shim sandbox. The vm context is escapable via prototype-chain traversal (`this.constructor.constructor('return process')()`), and the 3-second timeout and sandbox do not prevent secret exfiltration. *Scheduled fix: `v3-secured`, by moving execution out of the Node process entirely.* The test `tests/integration/execute-vm-escape.test.ts` intentionally stays failing through v1 and v2 as the active known-broken state.
+_(None remaining from the original 14-flaw list. v3-secured closes the last item, Known Issue #2. Future v-states address design/UX — v4-designed — rather than new security items. See the v3-secured "Known limitations" section below for security work that is intentionally deferred.)_
+
+## Fixed as of v3-secured
+
+2. **~~Server-side vm execution~~ (fixed in v3-secured).** Was: `src/app/api/execute/route.ts` used `vm.runInNewContext(code, sandbox, { timeout: 3000 })` inside the Next.js process. The context was escapable via prototype-chain traversal (`this.constructor.constructor('return process')()`), letting any authenticated user read any environment variable — including every secret in `src/lib/env.ts`. Fix: an out-of-process runner. `src/lib/code-runner.ts` now `spawn`s a fresh `node` process with `env: {}`, pipes the user code over stdin, enforces a 3-second wall-clock timeout via `SIGKILL`, and caps output at 64 KiB. Even if the child's vm is escaped, the process environment is empty — there is nothing to steal. The route shape in `src/app/api/execute/route.ts` is preserved (session → validate → business → response). The test `tests/integration/execute-vm-escape.test.ts` **now passes**.
 
 ## Fixed as of v2-deployed
 
@@ -152,6 +156,77 @@ curl http://localhost:3000/api/health
 
 Production needs a reverse proxy, TLS, secrets manager, backups, and a deploy pipeline — none of which v2-deployed provides. That is Chapter 8 / v3-secured / v4-designed territory.
 
+## Security (v3-secured)
+
+v3-secured is the Chapter 7 teaching surface. Four changes landed, plus an audit pass that documents what did not need to change.
+
+### 1. Out-of-process code runner — the centerpiece
+
+`src/lib/code-runner.ts` + `src/app/api/execute/route.ts`. The vm sandbox escape was never fixable at the function level. We replaced the in-process runner with `child_process.spawn(node, ['-e', runner], { env: {}, cwd: '/tmp', stdio: 'pipe' })`. Key properties:
+
+- The child process has an **empty environment** (`env: {}`), so a prototype-chain escape finds nothing worth exfiltrating. This is the actual defense, not the vm's `timeout:` option.
+- Wall-clock timeout is enforced by the parent with `SIGKILL` after 3 seconds. The child does not own the deadline.
+- Output size is capped at 64 KiB combined stdout+stderr. A `while(true) console.log('x')` is killed, not buffered to OOM.
+- Response shape is preserved (`{ output, errors, runtimeError, result }`) so the `CodeEditor` UI and `execute-auth` test continue to work without change.
+- Route shape is preserved (session → rate limit → input validation → business → response).
+
+Reading order for a new engineer: read `src/app/api/execute/route.ts` first (the shape stays legible in 2 minutes), then `src/lib/code-runner.ts` for the runner itself. The inline runner source is kept as a string constant so the sandbox and the process boundary are both visible in one file.
+
+Trade-off documented in comments: spawning a node process costs ~50–150ms. Fine for a "Run code" button; a production coding platform at high QPS would pool pre-warmed workers or use `isolated-vm` / a container. The teaching point is that the architectural fix is simple once you accept that the function-level patches all fail.
+
+### 2. Prompt-injection defenses on the AI assistant route
+
+`src/app/api/courses/[courseId]/lessons/[lessonId]/ai-assistant/route.ts`:
+
+- **System prompt hardening.** Explicitly names scope, tells the model to refuse requests to reveal the system prompt or any environment variable / secret / key, and to refuse "ignore previous instructions" style attacks.
+- **Input caps.** `MAX_QUESTION_CHARS = 2000`, `MAX_HISTORY_TURNS = 6`, `MAX_HISTORY_MESSAGE_CHARS = 2000`. Over-long questions → 400. History messages are clipped per-message before forwarding (so an attacker cannot smuggle a giant payload via the history channel that the per-message filter misses).
+- **Output cap.** `MAX_OUTPUT_TOKENS = 512` on the outbound `messages.create` call.
+- **Output filtering.** `redactSecrets()` scans the model response for env-var-name patterns (`*SECRET*`, `*API_KEY*`, `*_TOKEN`, explicit names like `DATABASE_URL` / `JWT_SECRET` / `ANTHROPIC_API_KEY`) and live-key shapes (`sk-ant-…`, `sk_test_…`, `sk_live_…`), replacing matches with `[REDACTED]`. This is the last line of defense — if the model is tricked into leaking something, the route scrubs it before it reaches the client.
+- **Regression guard.** Role whitelisting from v1-tested (Known Issue #5) is preserved and covered by both the v1 test and the new prompt-injection test suite.
+
+Test: `tests/integration/assistant-prompt-injection.test.ts` (8 cases) mocks the Anthropic SDK to deterministically verify each of the above.
+
+### 3. Session cookie hardening
+
+`src/lib/auth.ts`:
+
+- `httpOnly: true` — kept.
+- `sameSite: 'strict'` — tightened from `'lax'`. No legitimate cross-site flow in this app authenticates via top-level navigation (Stripe Checkout is a redirect OUT; the Stripe webhook is signature-verified server-to-server). This is the baseline CSRF defense for every state-changing route.
+- `secure: true in production` — kept. Dev / localhost keeps `secure: false` so http:// still works.
+- `__Host-avitam_session` cookie name prefix in production — added. The browser refuses any attempt to set this cookie with a `Domain` attribute or a non-root `Path`, which blocks sub-domain cookie confusion attacks on a shared-domain deploy. In dev/test the plain `avitam_session` name is kept so tests and the cookie mock continue to work.
+- Session lifetime — kept at 7 days. Shorter would churn users without meaningful security gain given the httpOnly + sameSite=strict combination. Production would pair this with server-side revocation (out of scope for the teaching spine).
+
+### 4. SQL injection audit
+
+Every `query()` / `queryOne()` call in `src/**` was inspected. Result: **zero string-concatenation queries.** All of them use `pg`'s `$1, $2` placeholders. The full call sites audited:
+
+- `src/app/api/auth/login/route.ts`, `src/app/api/auth/register/route.ts`
+- `src/app/api/stripe/checkout/route.ts`, `src/app/api/stripe/webhook/route.ts`
+- `src/app/api/enrollments/route.ts`
+- `src/app/api/courses/route.ts`, `src/app/api/courses/[courseId]/lessons/route.ts`
+- `src/app/api/courses/[courseId]/lessons/[lessonId]/{route.ts,progress/route.ts,ai-assistant/route.ts}`
+- `src/app/{layout,dashboard,courses,courses/[courseId],courses/[courseId]/lessons/[lessonId]}/page.tsx` (server components)
+
+The grep `query(One)?\s*\([^)]*\$\{[^}]+\}` also returns zero matches. `pg` parameterisation is the convention and every route follows it. No change required; documented here so future agents know the audit was done.
+
+### 5. General OWASP sweep — findings
+
+- **CSRF.** Mitigated at the browser layer by `sameSite: 'strict'`. State-changing routes additionally require an authenticated session (`POST /api/execute`, `POST /api/enrollments`, `POST /api/stripe/checkout`, assistant, progress) so a cross-site actor cannot ride a victim's session even on a sameSite regression. `POST /api/stripe/webhook` is exempt — it is server-to-server from Stripe and is validated by `stripe.webhooks.constructEvent`, which is a cryptographic signature check, not a cookie check.
+- **XSS.** Single `dangerouslySetInnerHTML` in `src/app/courses/[courseId]/lessons/[lessonId]/page.tsx` renders lesson content through a homegrown `renderMarkdown()`. Lesson content is seeded from `src/lib/schema.sql` — there is no user-facing write path. Low risk today, but it is a latent hazard if an admin UI is added later. **Flagged for v4-designed / future Chapter 8 work** (either sanitise the HTML or switch to a real markdown renderer with a sanitiser). Not "fixed" in v3-secured because nothing in scope demands it and patching it would require picking a markdown library, which is design territory.
+- **IDOR.** Every lesson / progress / assistant route looks up the course and lesson by ID and enforces `lesson.course_id = courseId` + enrollment-for-paid-course. `/api/execute` takes no resource ID. `/api/stripe/checkout` takes a `courseId` from the request body and looks up the course + current session's enrollment before creating a Stripe session. No unchecked cross-user access paths found.
+- **SSRF.** Client-side `fetch()` calls are all same-origin. Server-side outbound HTTP is limited to `new Anthropic(...)` (fixed host) and `new Stripe(...)` (fixed host), neither of which takes a user-supplied URL. Webhook receives from Stripe and is signature-verified. No SSRF surface.
+- **Dependency CVEs (flaw 15 from the v0 log).** Not addressed in v3-secured — that is a separate category the book treats under the longevity pillar, and running `npm audit` on any given day is a moving target. The Next.js pin at `14.2.35` is preserved; it sits past `GHSA-f82v-jwr5-mffw`.
+
+### Known limitations after v3-secured
+
+Carried forward for future v-states / out-of-scope for Chapter 7:
+
+- **The in-memory rate limiter (`src/lib/rate-limit.ts`) does not survive multi-instance deploys.** Production needs Redis or equivalent. Marked with a comment in the file.
+- **No server-side session revocation.** A stolen JWT is valid for its full 7-day lifetime. Adding a revocation list is a state-management problem, not a security-code problem.
+- **Lesson content XSS surface via `dangerouslySetInnerHTML`.** Described above. Low risk today (no user-write path), would graduate to real risk if admin UI is added.
+- **No CSP header.** A Content-Security-Policy header would harden against XSS-by-inline-script if someone adds a lesson-authoring UI. Deferred.
+- **Runner still shares the host kernel.** Out-of-process defeats vm-escape-reads-env, but a hypothetical V8 JIT exploit that achieves native code execution in the child would still sit in the same OS. A real coding platform's next layer is a container / gVisor / nsjail / firecracker microVM. Comment in `src/lib/code-runner.ts` documents this.
+
 ## Test suite notes (v1-tested)
 
 The test suite uses **Vitest** (not Jest) and lives under `spine/tests/`. Structure:
@@ -162,19 +237,22 @@ The test suite uses **Vitest** (not Jest) and lives under `spine/tests/`. Struct
 
 **Test DB connection.** Defaults to `postgresql://avitam:avitam@localhost:5432/avitam_teach_v1_test`; override via `DATABASE_URL`. Create the DB once with `createdb -h localhost -U avitam avitam_teach_v1_test`.
 
-**Known-issue tests: current pass/fail status as of v2-deployed.**
+**Known-issue tests: current pass/fail status as of v3-secured.**
   1. `tests/unit/env-fallback.test.ts` → Known Issue #1 (JWT_SECRET fallback). **Passes on v2-deployed** after `src/lib/env.ts` landed.
   2. `tests/integration/lesson-answer-leak.test.ts` → Known Issue #3 (`code_solution` leak). **Passes on v2-deployed** after the explicit column list fix landed.
   3. `tests/integration/progress-bypass.test.ts` → Known Issue #4a (no enrollment check). **Passes on v2-deployed** after the enrollment check landed in the progress route.
   4. `tests/integration/quiz-score-trust.test.ts` → Known Issue #4b (client-supplied quiz_score). **Passes on v2-deployed** after server-side quiz scoring landed.
   5. `tests/integration/assistant-history-injection.test.ts` → Known Issue #5 (role injection). **Passes on v2-deployed** after role whitelisting landed.
-  6. `tests/integration/execute-vm-escape.test.ts` → Known Issue #2 (vm prototype escape). **Still failing on v2-deployed** — scheduled fix is v3-secured.
+  6. `tests/integration/execute-vm-escape.test.ts` → Known Issue #2 (vm prototype escape). **Passes on v3-secured** after the out-of-process runner landed.
 
-Tests 2–5 were marked "Fix: v1-tested" in CLAUDE.md but the v1 commit only updated the doc, not the code. v2-deployed brings the code into alignment. Do not "repair" any remaining known-issue test by changing its assertion — when a fix lands, the assertion starts passing naturally.
+Tests 2–5 were marked "Fix: v1-tested" in CLAUDE.md but the v1 commit only updated the doc, not the code. v2-deployed brought the code into alignment. Do not "repair" any remaining known-issue test by changing its assertion — when a fix lands, the assertion starts passing naturally.
 
 **v2-deployed also adds three new tests:**
   - `tests/integration/health.test.ts` — `GET /api/health` shape check.
   - `tests/integration/rate-limit.test.ts` — verifies login (11th request) and assistant (21st request) return 429 with `Retry-After`.
+
+**v3-secured adds one new test file:**
+  - `tests/integration/assistant-prompt-injection.test.ts` (8 cases) — covers system-prompt contents, `max_tokens` cap, over-long question rejection, history-turn cap, per-message clip, regression guard on role-filtering, output redaction, and the classic "ignore previous instructions" attack.
 
 **SDK mocking.** Tests that touch the Anthropic or Stripe SDKs use `vi.mock('@anthropic-ai/sdk', ...)` / `vi.mock('stripe', ...)` at the top of the file, *before* importing the route under test, so the route's module-load-time `new Anthropic(...)` / `new Stripe(...)` picks up the fake. No real API calls are made by the suite.
 

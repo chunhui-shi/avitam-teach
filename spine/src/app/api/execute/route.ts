@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { runUntrustedCode } from '@/lib/code-runner';
 import {
   checkRateLimit,
   getClientIp,
@@ -7,10 +8,14 @@ import {
   RATE_LIMITS,
 } from '@/lib/rate-limit';
 
-// Sandboxed JavaScript execution using Node.js child_process
-// Runs user code in a separate process with a timeout
+// v3-secured: user-supplied JavaScript is executed in a SEPARATE OS process
+// with an empty environment. See src/lib/code-runner.ts for the full
+// security rationale. The teaching point for Chapter 7: some security
+// problems cannot be fixed at the function level — they require an
+// architectural change to the trust boundary.
 export async function POST(req: NextRequest) {
   try {
+    // 1. Session check.
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
@@ -24,55 +29,25 @@ export async function POST(req: NextRequest) {
       return rateLimitExceededResponse(rl.retryAfterSeconds);
     }
 
+    // 2. Input validation.
     const { code } = await req.json();
     if (!code || typeof code !== 'string') {
       return NextResponse.json({ error: 'Code is required' }, { status: 400 });
     }
 
     if (code.length > 10000) {
-      return NextResponse.json({ error: 'Code too long (max 10000 chars)' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Code too long (max 10000 chars)' },
+        { status: 400 }
+      );
     }
 
-    // Use Node.js vm module for sandboxed execution (server-side only)
-    const { runInNewContext } = await import('vm');
+    // 3. Business logic. Execute out-of-process.
+    const result = await runUntrustedCode(code);
 
-    const logs: string[] = [];
-    const errors: string[] = [];
-
-    const sandbox = {
-      console: {
-        log: (...args: unknown[]) => {
-          logs.push(args.map(a => {
-            if (typeof a === 'object' && a !== null) {
-              try { return JSON.stringify(a); } catch { return String(a); }
-            }
-            return String(a);
-          }).join(' '));
-        },
-        error: (...args: unknown[]) => {
-          errors.push(args.map(a => String(a)).join(' '));
-        },
-        warn: (...args: unknown[]) => {
-          logs.push('[warn] ' + args.map(a => String(a)).join(' '));
-        },
-      },
-    };
-
-    let runtimeError: string | null = null;
-    let result: unknown;
-
-    try {
-      result = runInNewContext(code, sandbox, { timeout: 3000 });
-    } catch (err) {
-      runtimeError = err instanceof Error ? err.message : String(err);
-    }
-
-    return NextResponse.json({
-      output: logs,
-      errors,
-      runtimeError,
-      result: result !== undefined ? String(result) : undefined,
-    });
+    // 4. Response. Shape is preserved from v0/v1/v2 so the CodeEditor UI
+    // and the execute-auth test keep working without change.
+    return NextResponse.json(result);
   } catch (err) {
     console.error('Execute error:', err);
     return NextResponse.json({ error: 'Execution failed' }, { status: 500 });
