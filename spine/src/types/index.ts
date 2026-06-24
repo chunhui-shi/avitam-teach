@@ -2,12 +2,16 @@ export interface User {
   id: number;
   email: string;
   name: string;
+  role: 'student' | 'instructor' | 'admin';
+  bio: string | null;
+  avatar_url: string | null;
   stripe_customer_id: string | null;
   created_at: string;
 }
 
 export interface Course {
   id: number;
+  instructor_id: number | null;
   slug: string;
   title: string;
   description: string;
@@ -17,6 +21,7 @@ export interface Course {
   created_at: string;
   lesson_count?: number;
   enrolled?: boolean;
+  instructor_name?: string | null;
 }
 
 export interface Lesson {
@@ -58,4 +63,15 @@ export interface LessonProgress {
   quiz_score: number | null;
   code_submission: string | null;
   completed_at: string | null;
+}
+
+export interface LessonComment {
+  id: number;
+  lesson_id: number;
+  user_id: number;
+  parent_id: number | null;
+  body: string;
+  created_at: string;
+  author_name: string;
+  author_avatar_url: string | null;
 }

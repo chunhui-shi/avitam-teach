@@ -4,13 +4,21 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'instructor', 'admin')),
+  bio TEXT,
+  avatar_url TEXT,
   stripe_customer_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'student';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
 -- Courses
 CREATE TABLE IF NOT EXISTS courses (
   id SERIAL PRIMARY KEY,
+  instructor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   slug TEXT UNIQUE NOT NULL,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
@@ -19,6 +27,8 @@ CREATE TABLE IF NOT EXISTS courses (
   published BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS instructor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
 -- Lessons
 CREATE TABLE IF NOT EXISTS lessons (
@@ -60,6 +70,19 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
   completed_at TIMESTAMPTZ,
   UNIQUE(user_id, lesson_id)
 );
+
+-- Lesson comments / discussion
+CREATE TABLE IF NOT EXISTS lesson_comments (
+  id SERIAL PRIMARY KEY,
+  lesson_id INTEGER REFERENCES lessons(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  parent_id INTEGER REFERENCES lesson_comments(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lesson_comments_lesson_id ON lesson_comments(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_comments_parent_id ON lesson_comments(parent_id);
 
 -- Stripe payment records
 CREATE TABLE IF NOT EXISTS stripe_events (

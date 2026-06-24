@@ -6,6 +6,7 @@ import { Lesson, Course, Enrollment } from '@/types';
 import { CodeEditor } from '@/components/lesson/CodeEditor';
 import { QuizWidget } from '@/components/lesson/QuizWidget';
 import { AIAssistant } from '@/components/lesson/AIAssistant';
+import { LessonComments } from '@/components/lesson/LessonComments';
 
 export const dynamic = 'force-dynamic';
 
@@ -199,6 +200,8 @@ export default async function LessonPage({
               </Link>
             )}
           </div>
+
+          <LessonComments courseId={courseId} lessonId={lessonId} />
         </div>
       </div>
 

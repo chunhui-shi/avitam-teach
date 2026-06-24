@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 interface NavbarProps {
-  user?: { name: string; email: string } | null;
+  user?: { name: string; email: string; role: string; avatarUrl: string | null } | null;
 }
 
 export function Navbar({ user }: NavbarProps) {
@@ -36,11 +36,31 @@ export function Navbar({ user }: NavbarProps) {
                 My Learning
               </Link>
             )}
+            {user && (user.role === 'instructor' || user.role === 'admin') && (
+              <Link href="/instructor" className="text-sm text-gray-600 hover:text-gray-900">
+                Instructor
+              </Link>
+            )}
+            {user?.role === 'admin' && (
+              <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">
+                Admin
+              </Link>
+            )}
           </div>
           <div className="flex items-center gap-4">
             {user ? (
               <>
-                <span className="text-sm text-gray-600">{user.name}</span>
+                <Link href="/profile" className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
+                  {user.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover border border-gray-200" />
+                  ) : (
+                    <span className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold">
+                      {user.name.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                  <span>{user.name}</span>
+                </Link>
                 <button
                   onClick={handleLogout}
                   disabled={loggingOut}
