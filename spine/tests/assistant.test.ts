@@ -7,17 +7,15 @@ vi.mock('@/lib/auth', async (orig) => {
 });
 
 // The model is the one dependency we must not call for real in a test — it
-// costs money and is non-deterministic. We stub the SDK so `messages.create`
+// costs money and is non-deterministic. The route reaches it through the
+// provider abstraction (lib/assistant-provider), so we stub that: `complete`
 // returns a reply we control, which lets us drive the output filter (Layer 4)
-// and confirm the input cap (Layer 2) without an API key.
+// and confirm the input cap (Layer 2) without an API key. (Stubbing the
+// provider instead of the SDK is exactly the testability the v4 seam buys.)
 const mockState = vi.hoisted(() => ({ reply: 'A helpful, lesson-focused answer.' }));
 
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: class {
-    messages = {
-      create: async () => ({ content: [{ type: 'text', text: mockState.reply }] }),
-    };
-  },
+vi.mock('@/lib/assistant-provider', () => ({
+  assistant: { complete: async () => mockState.reply },
 }));
 
 import { getSession } from '@/lib/auth';

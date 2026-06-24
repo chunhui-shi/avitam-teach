@@ -52,14 +52,9 @@ describe('GET /api/courses/[courseId]/lessons/[lessonId]', () => {
     expect(payload.code_solution).toBeUndefined();
   });
 
-  // KNOWN ISSUE (deferred): a quiz lesson still ships the correct-answer index
-  // inside quiz_data. We can't simply drop it the way we dropped code_solution,
-  // because the browser grades the quiz with that field (QuizWidget compares the
-  // student's answer to q.correct). Truly fixing it means grading on the server,
-  // a design change scheduled for the design pass. The test stays here, skipped,
-  // so the gap is tracked rather than forgotten — unskip it when grading moves
-  // server-side.
-  it.skip('does not leak a quiz lesson\'s correct answers', async () => {
+  // v4-designed un-skipped this: grading moved to the server (quiz/grade route),
+  // so the lesson endpoint now strips the answer key before sending it.
+  it('does not leak a quiz lesson\'s correct answers', async () => {
     const course = await seedCourse({ price_cents: 0 });
     const lesson = await seedLesson({
       course_id: course.id,

@@ -46,7 +46,18 @@ export interface QuizQuestion {
   id: string;
   question: string;
   options: string[];
-  correct: number;
+  // Optional because the student-facing lesson endpoint strips it: grading is
+  // server-side (see the quiz/grade route). It is present in the database row
+  // and on the server; it is never sent to the browser before grading.
+  correct?: number;
+}
+
+// What the quiz/grade endpoint returns after checking the student's answers.
+export interface QuizGradeResult {
+  score: number; // percentage 0-100
+  total: number;
+  correctCount: number;
+  results: { id: string; correctIndex: number; wasCorrect: boolean }[];
 }
 
 export interface Enrollment {

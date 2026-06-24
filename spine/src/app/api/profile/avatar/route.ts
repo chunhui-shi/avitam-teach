@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
 import { query } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { rateLimited } from '@/lib/rate-limit';
 import { sniffImageType } from '@/lib/image-validation';
+import { storage } from '@/lib/storage';
 import { User } from '@/types';
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
-// Upload an avatar image, store it on disk, and record the URL on the user.
+// Upload an avatar image, store it via the storage abstraction, and record the
+// URL on the user. The route no longer knows where the bytes physically land —
+// that's the storage layer's job (v4-designed).
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -42,13 +43,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unsupported or invalid image. Use PNG, JPEG, GIF, or WebP.' }, { status: 400 });
     }
 
-    const dir = path.join(process.cwd(), 'public', 'uploads', 'avatars');
-    await mkdir(dir, { recursive: true });
-
     const filename = `${session.userId}-${Date.now()}.${ext}`;
-    await writeFile(path.join(dir, filename), bytes);
-
-    const avatarUrl = `/uploads/avatars/${filename}`;
+    const avatarUrl = await storage.save(`avatars/${filename}`, bytes, `image/${ext}`);
     const users = await query<User>(`
       UPDATE users SET avatar_url = $1 WHERE id = $2
       RETURNING id, email, name, role, display_name, bio, avatar_url, created_at

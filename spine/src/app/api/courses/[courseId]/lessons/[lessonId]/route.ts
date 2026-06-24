@@ -55,6 +55,19 @@ export async function GET(
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
     }
 
+    // v4-designed: strip the correct-answer index from quiz questions before
+    // sending them to the browser. Grading now happens server-side (the
+    // quiz/grade route), so the client never needs — and never receives — the
+    // answer key. This closes the quiz answer-leak that Chapter 4 found and
+    // deferred (the skipped test for it is now un-skipped).
+    if (lesson.quiz_data) {
+      lesson.quiz_data = lesson.quiz_data.map((q) => {
+        const copy = { ...q };
+        delete copy.correct;
+        return copy;
+      });
+    }
+
     return NextResponse.json({ lesson });
   } catch (err) {
     console.error('Lesson error:', err);
