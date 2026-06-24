@@ -4,9 +4,19 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'student', -- student | instructor | admin
+  display_name TEXT,
+  bio TEXT,
+  avatar_url TEXT,
   stripe_customer_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Backfill columns on existing installs (no-ops if already present)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'student';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
 -- Courses
 CREATE TABLE IF NOT EXISTS courses (
@@ -17,8 +27,12 @@ CREATE TABLE IF NOT EXISTS courses (
   price_cents INTEGER NOT NULL DEFAULT 0, -- 0 = free
   image_url TEXT,
   published BOOLEAN DEFAULT false,
+  instructor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Backfill owning instructor on existing installs
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS instructor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
 -- Lessons
 CREATE TABLE IF NOT EXISTS lessons (
@@ -67,6 +81,18 @@ CREATE TABLE IF NOT EXISTS stripe_events (
   type TEXT NOT NULL,
   processed_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Lesson comments / discussion
+CREATE TABLE IF NOT EXISTS lesson_comments (
+  id SERIAL PRIMARY KEY,
+  lesson_id INTEGER REFERENCES lessons(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  parent_id INTEGER REFERENCES lesson_comments(id) ON DELETE CASCADE, -- null = top-level
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lesson_comments_lesson ON lesson_comments(lesson_id);
 
 -- Seed: sample courses
 INSERT INTO courses (slug, title, description, price_cents, published) VALUES

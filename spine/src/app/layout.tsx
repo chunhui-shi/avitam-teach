@@ -18,17 +18,22 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  let user: { name: string; email: string } | null = null;
+  let user: { name: string; email: string; role: string; avatar_url: string | null } | null = null;
 
   try {
     const session = await getSession();
     if (session) {
       const dbUser = await queryOne<User>(
-        'SELECT name, email FROM users WHERE id = $1',
+        'SELECT name, email, role, avatar_url FROM users WHERE id = $1',
         [session.userId]
       );
       if (dbUser) {
-        user = { name: dbUser.name, email: dbUser.email };
+        user = {
+          name: dbUser.name,
+          email: dbUser.email,
+          role: dbUser.role,
+          avatar_url: dbUser.avatar_url,
+        };
       }
     }
   } catch {

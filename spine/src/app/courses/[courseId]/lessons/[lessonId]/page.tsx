@@ -6,6 +6,7 @@ import { Lesson, Course, Enrollment } from '@/types';
 import { CodeEditor } from '@/components/lesson/CodeEditor';
 import { QuizWidget } from '@/components/lesson/QuizWidget';
 import { AIAssistant } from '@/components/lesson/AIAssistant';
+import { Comments } from '@/components/lesson/Comments';
 
 export const dynamic = 'force-dynamic';
 
@@ -172,6 +173,9 @@ export default async function LessonPage({
               />
             </div>
           )}
+
+          {/* Discussion */}
+          <Comments courseId={courseId} lessonId={lessonId} />
 
           {/* Navigation */}
           <div className="flex justify-between pt-4">

@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
+import { queryOne } from './db';
+import type { User, UserRole } from '@/types';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
 const COOKIE_NAME = 'avitam_session';
@@ -35,6 +37,21 @@ export async function getSession(): Promise<JwtPayload | null> {
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
   return verifyToken(token);
+}
+
+// Load the full user record for the current session (role, profile, etc.)
+export async function getCurrentUser(): Promise<User | null> {
+  const session = await getSession();
+  if (!session) return null;
+  return queryOne<User>(
+    `SELECT id, email, name, role, display_name, bio, avatar_url, stripe_customer_id, created_at
+     FROM users WHERE id = $1`,
+    [session.userId]
+  );
+}
+
+export function hasRole(role: UserRole | undefined, ...allowed: UserRole[]): boolean {
+  return !!role && allowed.includes(role);
 }
 
 export function createSessionCookie(token: string) {
