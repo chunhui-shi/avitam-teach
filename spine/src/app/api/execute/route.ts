@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { rateLimited } from '@/lib/rate-limit';
 
 // Sandboxed JavaScript execution using Node.js child_process
 // Runs user code in a separate process with a timeout
@@ -9,6 +10,10 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
+
+    // The runner spends CPU on every call; cap how fast one user can hammer it.
+    const limited = rateLimited(`execute:${session.userId}`, 60, 60_000);
+    if (limited) return limited;
 
     const { code } = await req.json();
     if (!code || typeof code !== 'string') {

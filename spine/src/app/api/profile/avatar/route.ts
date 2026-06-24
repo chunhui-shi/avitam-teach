@@ -3,6 +3,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { query } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { rateLimited } from '@/lib/rate-limit';
 import { User } from '@/types';
 
 const ALLOWED: Record<string, string> = {
@@ -22,6 +23,11 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
+
+    // Each upload writes a file to disk; cap uploads per user so the endpoint
+    // can't be used to fill the disk.
+    const limited = rateLimited(`avatar:${session.userId}`, 10, 60 * 60_000);
+    if (limited) return limited;
 
     const form = await req.formData();
     const file = form.get('avatar');

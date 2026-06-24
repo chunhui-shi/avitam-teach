@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
 import { verifyPassword, signToken, createSessionCookie } from '@/lib/auth';
+import { rateLimited, clientIp } from '@/lib/rate-limit';
 
 interface UserRow {
   id: number;
@@ -11,6 +12,11 @@ interface UserRow {
 
 export async function POST(req: NextRequest) {
   try {
+    // Throttle login attempts per client IP so the password endpoint can't be
+    // used for credential stuffing or brute force.
+    const limited = rateLimited(`login:${clientIp(req)}`, 10, 15 * 60_000);
+    if (limited) return limited;
+
     const { email, password } = await req.json();
 
     if (!email || !password) {

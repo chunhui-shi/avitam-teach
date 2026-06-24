@@ -4,8 +4,21 @@ import { cookies } from 'next/headers';
 import { queryOne } from './db';
 import type { User, UserRole } from '@/types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
 const COOKIE_NAME = 'avitam_session';
+
+// Read the signing secret at the point of use and refuse to operate without it.
+// The old code fell back to a hard-coded default when JWT_SECRET was unset, which
+// meant a misconfigured deploy would sign sessions with a secret that is public
+// in the source — anyone could forge a token. Now it throws instead.
+function jwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error(
+      'JWT_SECRET is not set. Refusing to sign or verify sessions with an insecure default.'
+    );
+  }
+  return secret;
+}
 
 export interface JwtPayload {
   userId: number;
@@ -21,12 +34,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, jwtSecret(), { expiresIn: '7d' });
 }
 
 export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+    return jwt.verify(token, jwtSecret()) as JwtPayload;
   } catch {
     return null;
   }

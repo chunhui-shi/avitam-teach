@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { resetRateLimits } from '@/lib/rate-limit';
 
 const CONN =
   process.env.DATABASE_URL ||
@@ -20,6 +21,8 @@ export async function resetDb() {
        lesson_progress, lesson_comments, stripe_events
      RESTART IDENTITY CASCADE`
   );
+  // Clear in-memory rate-limit counters too, so each test starts clean.
+  resetRateLimits();
 }
 
 export async function seedUser(

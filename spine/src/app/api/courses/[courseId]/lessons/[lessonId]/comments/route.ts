@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { rateLimited } from '@/lib/rate-limit';
 import { LessonComment, Enrollment } from '@/types';
 
 // Confirm the lesson exists in the course and the user may access it
@@ -82,6 +83,10 @@ export async function POST(
 
     const denied = await checkAccess(session.userId, courseId, lessonId);
     if (denied) return denied;
+
+    // Throttle comment posting per user to limit spam.
+    const limited = rateLimited(`comments:${session.userId}`, 20, 60_000);
+    if (limited) return limited;
 
     const { body, parent_id } = await req.json();
     const text = typeof body === 'string' ? body.trim() : '';

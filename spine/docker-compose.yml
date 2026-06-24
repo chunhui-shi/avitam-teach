@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: avitam
+      POSTGRES_PASSWORD: avitam
+      POSTGRES_DB: avitam
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U avitam"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://avitam:avitam@db:5432/avitam
+      # Fails to start if JWT_SECRET is not set in the environment — no insecure default.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment before running}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    # Avatars are written to the local filesystem (public/uploads). In a container
+    # that path is ephemeral and is NOT shared between replicas — so this volume is
+    # only a single-instance stopgap. Moving uploads to object storage is the real
+    # fix (deferred to the design pass).
+    volumes:
+      - uploads:/app/public/uploads
+
+volumes:
+  db-data:
+  uploads:

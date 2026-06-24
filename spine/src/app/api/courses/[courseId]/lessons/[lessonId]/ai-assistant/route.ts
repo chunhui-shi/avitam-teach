@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { queryOne } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { rateLimited } from '@/lib/rate-limit';
 import { Lesson, Enrollment } from '@/types';
 
 const anthropic = new Anthropic({
@@ -17,6 +18,11 @@ export async function POST(
     if (!session) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
+
+    // Every call hits a paid model, so an unthrottled endpoint is a cost bomb.
+    // Here, rate limiting is a correctness property, not just abuse protection.
+    const limited = rateLimited(`ai-assistant:${session.userId}`, 20, 60_000);
+    if (limited) return limited;
 
     const courseId = parseInt(params.courseId);
     const lessonId = parseInt(params.lessonId);
