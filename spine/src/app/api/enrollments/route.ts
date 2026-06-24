@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { Course, Enrollment } from '@/types';
+import { Course } from '@/types';
 
 // Enroll in a free course
 export async function POST(req: NextRequest) {
@@ -29,19 +29,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This is a paid course. Use checkout to enroll.' }, { status: 400 });
     }
 
-    const existing = await queryOne<Enrollment>(
-      'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
+    // Insert idempotently. The old code checked for an existing row and then
+    // inserted: two concurrent free-enroll requests both passed the check and
+    // then raced the UNIQUE(user_id, course_id) constraint, leaving the loser to
+    // throw an unhandled error (a 500). ON CONFLICT DO NOTHING lets the database
+    // settle the race in one statement — an empty RETURNING means a row already
+    // existed, so the caller is simply already enrolled.
+    const inserted = await query<{ id: number }>(
+      `INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2)
+       ON CONFLICT (user_id, course_id) DO NOTHING
+       RETURNING id`,
       [session.userId, courseId]
     );
 
-    if (existing) {
+    if (inserted.length === 0) {
       return NextResponse.json({ message: 'Already enrolled' });
     }
-
-    await query(
-      'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2)',
-      [session.userId, courseId]
-    );
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (err) {

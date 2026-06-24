@@ -38,8 +38,16 @@ export async function GET(
       }
     }
 
+    // SELECT * shipped the grading fields to the browser. A student needs the
+    // starter code and the quiz questions to work the lesson, but not the
+    // reference solution — so name the columns and leave code_solution out.
+    // (The quiz answer key still rides along inside quiz_data; removing that one
+    // means grading on the server instead of in the browser, a larger change
+    // deferred to the design pass.)
     const lesson = await queryOne<Lesson>(
-      'SELECT * FROM lessons WHERE id = $1 AND course_id = $2',
+      `SELECT id, course_id, title, slug, position, content, lesson_type,
+              quiz_data, code_starter, code_language, created_at
+       FROM lessons WHERE id = $1 AND course_id = $2`,
       [lessonId, courseId]
     );
 
