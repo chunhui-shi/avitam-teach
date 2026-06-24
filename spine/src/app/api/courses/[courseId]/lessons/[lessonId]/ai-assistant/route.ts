@@ -60,7 +60,7 @@ export async function POST(
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
     }
 
-    const { question, history } = await req.json();
+    const { question } = await req.json();
 
     if (!question || typeof question !== 'string') {
       return NextResponse.json({ error: 'Question is required' }, { status: 400 });
@@ -85,13 +85,14 @@ Your role:
 - If asked about unrelated topics, gently redirect to the lesson material
 - Keep responses focused and under 300 words unless a longer explanation is truly needed`;
 
-    // Build message history (last 6 turns max to keep context manageable)
-    const messageHistory = Array.isArray(history) ? history.slice(-6) : [];
+    // v3-secured: do NOT include any client-supplied conversation history.
+    // The previous version spread a `history` array from the request body into
+    // the messages and cast each turn's `role` straight from client input — so
+    // a caller could fabricate prior "assistant" turns and steer the model
+    // (prompt injection). The server owns the conversation; the client supplies
+    // only the current question. (Real multi-turn memory would be reconstructed
+    // from a server-side store — a design decision, not a request-body trust.)
     const messages: Anthropic.MessageParam[] = [
-      ...messageHistory.map((m: { role: string; content: string }) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      })),
       { role: 'user', content: sanitizedQuestion },
     ];
 

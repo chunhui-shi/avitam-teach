@@ -4,15 +4,8 @@ import path from 'path';
 import { query } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { rateLimited } from '@/lib/rate-limit';
+import { sniffImageType } from '@/lib/image-validation';
 import { User } from '@/types';
-
-const ALLOWED: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/jpg': 'jpg',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
-};
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -35,15 +28,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    const ext = ALLOWED[file.type];
-    if (!ext) {
-      return NextResponse.json({ error: 'Unsupported image type. Use PNG, JPEG, GIF, or WebP.' }, { status: 400 });
-    }
-    if (file.size > MAX_BYTES) {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    if (bytes.length > MAX_BYTES) {
       return NextResponse.json({ error: 'Image must be 5 MB or smaller' }, { status: 400 });
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
+    // v3-secured: derive the type from the actual file bytes, not the
+    // client-declared Content-Type. A request can claim image/png while sending
+    // anything; store it only if the bytes really are a supported image, and
+    // take the extension from what the bytes say — not from the request header.
+    const ext = sniffImageType(bytes);
+    if (!ext) {
+      return NextResponse.json({ error: 'Unsupported or invalid image. Use PNG, JPEG, GIF, or WebP.' }, { status: 400 });
+    }
+
     const dir = path.join(process.cwd(), 'public', 'uploads', 'avatars');
     await mkdir(dir, { recursive: true });
 
