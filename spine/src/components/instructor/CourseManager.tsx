@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Course, Lesson } from '@/types';
+import { Course, CourseMaterial, Lesson } from '@/types';
 
 interface CourseManagerProps {
   course: Course;
@@ -18,14 +18,14 @@ interface Enrollee {
   completed_lessons: number;
 }
 
-type Tab = 'details' | 'lessons' | 'enrollees';
+type Tab = 'details' | 'lessons' | 'materials' | 'enrollees';
 
 export function CourseManager({ course, isAdmin, onCourseChange }: CourseManagerProps) {
   const [tab, setTab] = useState<Tab>('details');
   return (
     <div>
       <div className="flex gap-2 mb-4">
-        {(['details', 'lessons', 'enrollees'] as Tab[]).map(t => (
+        {(['details', 'lessons', 'materials', 'enrollees'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -39,6 +39,7 @@ export function CourseManager({ course, isAdmin, onCourseChange }: CourseManager
       </div>
       {tab === 'details' && <DetailsTab course={course} isAdmin={isAdmin} onCourseChange={onCourseChange} />}
       {tab === 'lessons' && <LessonsTab courseId={course.id} />}
+      {tab === 'materials' && <MaterialsTab courseId={course.id} />}
       {tab === 'enrollees' && <EnrolleesTab courseId={course.id} />}
     </div>
   );
@@ -309,6 +310,124 @@ function LessonRow({ courseId, lesson, onChange }: { courseId: number; lesson: L
         <Button onClick={save} loading={saving} size="sm">Save</Button>
         <Button onClick={() => setEditing(false)} variant="ghost" size="sm">Cancel</Button>
       </div>
+    </div>
+  );
+}
+
+function MaterialsTab({ courseId }: { courseId: number }) {
+  const [materials, setMaterials] = useState<CourseMaterial[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/instructor/courses/${courseId}/materials`);
+      const data = await res.json();
+      if (res.ok) setMaterials(data.materials || []);
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!materials.some(material => material.status === 'pending' || material.status === 'processing')) return;
+    const timer = setInterval(load, 3000);
+    return () => clearInterval(timer);
+  }, [materials, load]);
+
+  const upload = async () => {
+    if (!file) {
+      setError('Choose a text, Markdown, or PDF file.');
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.set('material', file);
+      if (title.trim()) form.set('title', title.trim());
+      const res = await fetch(`/api/instructor/courses/${courseId}/materials`, {
+        method: 'POST',
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Could not upload material');
+        return;
+      }
+      setFile(null);
+      setTitle('');
+      await load();
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const retry = async (id: number) => {
+    await fetch(`/api/instructor/courses/${courseId}/materials/${id}`, { method: 'PATCH' });
+    await load();
+  };
+
+  const remove = async (id: number) => {
+    await fetch(`/api/instructor/courses/${courseId}/materials/${id}`, { method: 'DELETE' });
+    await load();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="border border-gray-100 rounded-lg p-4 space-y-3">
+        <div>
+          <p className="text-sm font-medium text-gray-700">Add course material</p>
+          <p className="text-xs text-gray-500 mt-1">
+            UTF-8 text, Markdown, or PDF up to 10 MB. The assistant uses ready material as cited evidence.
+          </p>
+        </div>
+        <input
+          type="text"
+          value={title}
+          onChange={event => setTitle(event.target.value)}
+          placeholder="Display title (optional)"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <input
+          type="file"
+          accept="text/plain,text/markdown,.md,.txt,application/pdf,.pdf"
+          onChange={event => setFile(event.target.files?.[0] || null)}
+          className="block w-full text-sm text-gray-600"
+        />
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button onClick={upload} loading={uploading} size="sm">Upload and index</Button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-gray-500">Loading materials…</p>
+      ) : materials.length === 0 ? (
+        <p className="text-sm text-gray-500">No course materials yet.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
+          {materials.map(material => (
+            <li key={material.id} className="flex items-center justify-between px-3 py-3 gap-3">
+              <div className="min-w-0">
+                <p className="text-sm text-gray-800 truncate">{material.title}</p>
+                <p className="text-xs text-gray-500 truncate">
+                  {material.filename} · {material.status}
+                  {material.error_message ? ` · ${material.error_message}` : ''}
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {material.status === 'failed' && (
+                  <Button onClick={() => retry(material.id)} variant="ghost" size="sm">Retry</Button>
+                )}
+                <Button onClick={() => remove(material.id)} variant="ghost" size="sm">Remove</Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

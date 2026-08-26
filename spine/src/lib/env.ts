@@ -9,6 +9,7 @@ const REQUIRED = ['DATABASE_URL', 'JWT_SECRET'] as const;
 // Missing optional vars disable a feature but are not fatal.
 const OPTIONAL = [
   'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
 ] as const;

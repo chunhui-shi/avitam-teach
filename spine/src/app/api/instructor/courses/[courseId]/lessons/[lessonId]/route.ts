@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import { authorizeCourseManagement } from '@/lib/authz';
 import { Lesson } from '@/types';
+import { enqueueIngestion } from '@/lib/ingestion';
 
 // Edit or reorder a lesson within a managed course.
 export async function PATCH(
@@ -61,6 +62,10 @@ export async function PATCH(
       values
     );
 
+    if (title !== undefined || content !== undefined) {
+      await enqueueIngestion(courseId, 'lesson', lessonId);
+    }
+
     return NextResponse.json({ lesson: lessons[0] });
   } catch (err) {
     console.error('Lesson PATCH error:', err);
@@ -85,10 +90,16 @@ export async function DELETE(
       return NextResponse.json({ error: authz.error }, { status: authz.status });
     }
 
-    const deleted = await query(
-      'DELETE FROM lessons WHERE id = $1 AND course_id = $2 RETURNING id',
-      [lessonId, courseId]
-    );
+    const deleted = await query(`
+      WITH removed_chunks AS (
+        DELETE FROM knowledge_chunks
+        WHERE source_type = 'lesson' AND source_id = $1
+      ), removed_jobs AS (
+        DELETE FROM ingestion_jobs
+        WHERE source_type = 'lesson' AND source_id = $1
+      )
+      DELETE FROM lessons WHERE id = $1 AND course_id = $2 RETURNING id
+    `, [lessonId, courseId]);
     if (deleted.length === 0) {
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
     }

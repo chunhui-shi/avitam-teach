@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { authorizeCourseManagement } from '@/lib/authz';
 import { Course } from '@/types';
+import { enqueueIngestion } from '@/lib/ingestion';
 
 // Edit a course. Publishing/unpublishing is admin-only.
 export async function PATCH(
@@ -47,6 +48,16 @@ export async function PATCH(
       `UPDATE courses SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
       values
     );
+
+    if (published === true) {
+      const lessons = await query<{ id: number }>(
+        'SELECT id FROM lessons WHERE course_id = $1',
+        [courseId]
+      );
+      for (const lesson of lessons) {
+        await enqueueIngestion(courseId, 'lesson', lesson.id);
+      }
+    }
 
     return NextResponse.json({ course: courses[0] });
   } catch (err) {

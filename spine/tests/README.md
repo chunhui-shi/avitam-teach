@@ -41,7 +41,15 @@ suite runs, and every test starts from a truncated, freshly-seeded database.
 | `image-validation.test.ts` | Uploaded avatar byte and size validation. |
 | `assistant.test.ts` | Assistant input boundaries and output redaction. |
 | `redact.test.ts` | Secret-shaped output redaction. |
+| `material-validation.test.ts` | Uploaded course-material byte and UTF-8 validation. |
+| `materials.test.ts` | Course ownership, duplicate upload handling, and deletion lifecycle. |
+| `ingestion.test.ts` | Idempotent chunk replacement and material status transitions. |
+| `knowledge.test.ts` | Chunking, course-scoped vector retrieval, and evidence delimiters. |
 
 At `v1-tested`, one test is intentionally skipped to keep the quiz-answer leak
 visible until its design change. At `v4-designed`, server-side grading closes
 that gap and all 34 tests pass with no skips.
+
+At `v5-evolved`, the RAG lifecycle and authorization checks bring the suite to
+47 passing tests with no skips. Tests stub paid model and embedding providers;
+they do not make network calls.

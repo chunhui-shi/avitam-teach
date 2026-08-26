@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { queryOne } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { stripeClient } from '@/lib/stripe-client';
 import { Course, Enrollment, User } from '@/types';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2026-03-25.dahlia',
-});
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +10,7 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
+    const stripe = stripeClient();
 
     const { courseId } = await req.json();
     if (!courseId) {

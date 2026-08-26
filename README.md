@@ -29,6 +29,7 @@ some of their statements are intentionally stale when read from `main`.
 | `v2-deployed` | Chapter 5 | Container build, CI gate, configuration validation, rate limiting, and basic observability |
 | `v3-secured` | Chapter 6 | Isolated code execution, upload validation, session hardening, and layered assistant defenses |
 | `v4-designed` | Chapter 7 | Server-side quiz grading plus storage and model-provider seams |
+| `v5-evolved` | Integration checkpoint | Course-scoped retrieval over published lessons and instructor-uploaded material |
 
 Chapter 4 begins from the intermediate `v0.1-features` tag. That checkpoint adds
 instructor roles, profiles, avatar uploads, and lesson comments while retaining
@@ -40,9 +41,14 @@ means that the repository gains production-shaped artifacts readers can study;
 it does not mean that this sample application was deployed or certified for a
 production environment.
 
+The first five tags are discipline checkpoints. `v5-evolved` begins a second
+cycle that tests whether the earlier design can absorb a substantial new
+requirement. Its RAG pipeline is driven by course-wide questions over uploaded
+teacher material, rather than added as an isolated demonstration.
+
 ## Start with the baseline
 
-You need Node.js 20 or later and PostgreSQL. Stripe and Anthropic credentials
+You need Node.js 20.16 or later and PostgreSQL. Stripe and Anthropic credentials
 are optional when you use the free course and skip the teaching assistant.
 
 ```bash
@@ -85,8 +91,8 @@ same lint, type-check, and test commands run in `.github/workflows/ci.yml`.
 
 ## Status
 
-`main` contains the `v4-designed` application plus repository documentation.
-The completed state has 34 passing tests. It remains a teaching artifact, not a
+`main` contains the latest companion checkpoint plus repository documentation.
+The `v5-evolved` state has 47 passing tests. It remains a teaching artifact, not a
 hosted service or a promise of deployment readiness.
 
 ## License

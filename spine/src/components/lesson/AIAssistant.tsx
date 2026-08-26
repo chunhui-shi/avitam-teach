@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  sources?: { number: number; type: 'lesson' | 'material'; id: number; title: string }[];
 }
 
 interface AIAssistantProps {
@@ -38,16 +39,14 @@ export function AIAssistant({ courseId, lessonId }: AIAssistantProps) {
       const res = await fetch(`/api/courses/${courseId}/lessons/${lessonId}/ai-assistant`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: userMsg.content,
-          history: messages,
-        }),
+        body: JSON.stringify({ question: userMsg.content }),
       });
 
       const data = await res.json();
       const assistantMsg: Message = {
         role: 'assistant',
         content: data.answer || data.error || 'Sorry, I could not respond.',
+        sources: data.sources,
       };
       setMessages(prev => [...prev, assistantMsg]);
     } catch {
@@ -76,7 +75,7 @@ export function AIAssistant({ courseId, lessonId }: AIAssistantProps) {
               <span className="text-lg">🤖</span>
               <div>
                 <p className="font-medium text-sm">AI Teaching Assistant</p>
-                <p className="text-xs text-indigo-200">Ask me anything about this lesson</p>
+                <p className="text-xs text-indigo-200">Answers grounded in course sources</p>
               </div>
             </div>
             <button onClick={() => setOpen(false)} className="text-white hover:text-indigo-200 text-xl leading-none">×</button>
@@ -85,7 +84,7 @@ export function AIAssistant({ courseId, lessonId }: AIAssistantProps) {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 && (
               <p className="text-sm text-gray-500 text-center mt-4">
-                Hi! I&apos;m here to help you with this lesson. Ask me anything!
+                Ask a question about this course. I&apos;ll use indexed lessons and instructor material.
               </p>
             )}
             {messages.map((msg, i) => (
@@ -95,7 +94,16 @@ export function AIAssistant({ courseId, lessonId }: AIAssistantProps) {
                     ? 'bg-indigo-600 text-white rounded-br-sm'
                     : 'bg-gray-100 text-gray-800 rounded-bl-sm'
                 }`}>
-                  {msg.content}
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {msg.sources && msg.sources.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                      {msg.sources.map(source => (
+                        <p key={`${source.type}:${source.id}:${source.number}`} className="text-xs text-gray-500">
+                          [{source.number}] {source.title} ({source.type})
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
