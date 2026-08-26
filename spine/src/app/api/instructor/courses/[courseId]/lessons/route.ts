@@ -3,6 +3,7 @@ import { query, queryOne } from '@/lib/db';
 import { authorizeCourseManagement } from '@/lib/authz';
 import { slugify } from '@/lib/utils';
 import { Lesson } from '@/types';
+import { enqueueIngestion } from '@/lib/ingestion';
 
 // List all lessons in a managed course (full rows, including unpublished/solution).
 export async function GET(
@@ -88,6 +89,7 @@ export async function POST(
       type === 'quiz' && quiz_data ? JSON.stringify(quiz_data) : null,
     ]);
 
+    await enqueueIngestion(courseId, 'lesson', lessons[0].id);
     return NextResponse.json({ lesson: lessons[0] }, { status: 201 });
   } catch (err) {
     console.error('Manage lessons POST error:', err);

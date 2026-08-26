@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { query, queryOne } from '@/lib/db';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2026-03-25.dahlia',
-});
+import { stripeClient } from '@/lib/stripe-client';
 
 // Disable body parsing — Stripe needs raw body for signature verification
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  let stripe: Stripe;
+  try {
+    stripe = stripeClient();
+  } catch (err) {
+    console.error('Stripe is not configured:', err);
+    return NextResponse.json({ error: 'Payments are not configured' }, { status: 503 });
+  }
   const sig = req.headers.get('stripe-signature');
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 

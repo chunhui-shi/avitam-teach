@@ -1,11 +1,13 @@
 {
-  "name": "run-4-claude-sonnet-minimal",
-  "version": "0.1.0",
+  "name": "avitam-teach",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "worker": "tsx scripts/knowledge-worker.ts",
+    "knowledge:backfill": "tsx scripts/knowledge-backfill.ts",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -18,10 +20,12 @@
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
     "next": "14.2.35",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
     "react": "^18",
     "react-dom": "^18",
-    "stripe": "^22.0.1"
+    "stripe": "^22.0.1",
+    "tsx": "^4.23.12"
   },
   "devDependencies": {
     "@types/node": "^20",

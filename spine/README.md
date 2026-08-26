@@ -6,8 +6,8 @@ README for the book checkpoint map and safety warning.
 
 ## Requirements
 
-- Node.js 20 or later
-- PostgreSQL 14 or later
+- Node.js 20.16 or later
+- PostgreSQL 14 or later with the pgvector extension
 - Docker and Docker Compose when following the Chapter 5 deployment path
 
 ## Local development
@@ -26,6 +26,8 @@ Create `.env.local`:
 DATABASE_URL=postgres://localhost/avitam_teach
 JWT_SECRET=replace-with-a-long-local-development-value
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+# Required when using course-material retrieval:
+OPENAI_API_KEY=replace-with-an-api-key
 ```
 
 The free course works without Stripe or Anthropic credentials. Add
@@ -33,6 +35,20 @@ The free course works without Stripe or Anthropic credentials. Add
 exercising those integrations.
 
 Run the application with `npm run dev` and open <http://localhost:3000>.
+
+The knowledge assistant has a separate ingestion process. After applying the
+schema, queue existing lessons once and run the worker in another terminal:
+
+```bash
+npm run knowledge:backfill
+npm run worker
+```
+
+The embedding request follows the [official OpenAI embeddings API][embeddings]
+and defaults to `text-embedding-3-small` with 256 dimensions. Override
+`EMBEDDING_MODEL` only with a model that supports the configured dimensions.
+
+[embeddings]: https://developers.openai.com/api/docs/guides/embeddings
 
 ## Verification
 

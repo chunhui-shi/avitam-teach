@@ -18,7 +18,8 @@ let slugCounter = 0;
 export async function resetDb() {
   await testPool.query(
     `TRUNCATE users, courses, lessons, enrollments,
-       lesson_progress, lesson_comments, stripe_events
+       lesson_progress, lesson_comments, stripe_events,
+       course_materials, knowledge_chunks, ingestion_jobs
      RESTART IDENTITY CASCADE`
   );
   // Clear in-memory rate-limit counters too, so each test starts clean.
@@ -42,17 +43,18 @@ export async function seedUser(
 }
 
 export async function seedCourse(
-  opts: { price_cents?: number; published?: boolean; slug?: string } = {}
+  opts: { price_cents?: number; published?: boolean; slug?: string; instructor_id?: number | null } = {}
 ) {
   const {
     price_cents = 0,
     published = true,
     slug = `course-${++slugCounter}`,
+    instructor_id = null,
   } = opts;
   const { rows } = await testPool.query(
-    `INSERT INTO courses (slug, title, description, price_cents, published)
-     VALUES ($1, 'Test Course', 'A test course', $2, $3) RETURNING id, price_cents`,
-    [slug, price_cents, published]
+    `INSERT INTO courses (slug, title, description, price_cents, published, instructor_id)
+     VALUES ($1, 'Test Course', 'A test course', $2, $3, $4) RETURNING id, price_cents`,
+    [slug, price_cents, published, instructor_id]
   );
   return rows[0] as { id: number; price_cents: number };
 }

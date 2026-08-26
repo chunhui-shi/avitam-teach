@@ -89,3 +89,18 @@ export interface LessonComment {
   author_name?: string;
   author_avatar_url?: string | null;
 }
+
+export type MaterialStatus = 'pending' | 'processing' | 'ready' | 'failed';
+
+export interface CourseMaterial {
+  id: number;
+  course_id: number;
+  uploaded_by: number;
+  title: string;
+  filename: string;
+  content_type: 'text/plain' | 'text/markdown' | 'application/pdf';
+  status: MaterialStatus;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}

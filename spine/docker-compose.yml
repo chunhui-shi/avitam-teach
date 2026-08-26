@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: avitam
       POSTGRES_PASSWORD: avitam
@@ -16,7 +16,9 @@ services:
       retries: 5
 
   app:
-    build: .
+    build:
+      context: .
+      target: runner
     depends_on:
       db:
         condition: service_healthy
@@ -24,6 +26,8 @@ services:
       DATABASE_URL: postgres://avitam:avitam@db:5432/avitam
       # Fails to start if JWT_SECRET is not set in the environment — no insecure default.
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment before running}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       NODE_ENV: production
     ports:
       - "3000:3000"
@@ -31,6 +35,20 @@ services:
     # that path is ephemeral and is NOT shared between replicas — so this volume is
     # only a single-instance stopgap. Moving uploads to object storage is the real
     # fix (deferred to the design pass).
+    volumes:
+      - uploads:/app/public/uploads
+
+  worker:
+    build:
+      context: .
+      target: worker
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://avitam:avitam@db:5432/avitam
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY before running the knowledge worker}
+      NODE_ENV: production
     volumes:
       - uploads:/app/public/uploads
 

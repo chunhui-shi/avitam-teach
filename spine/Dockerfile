@@ -14,6 +14,20 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
+# ---- ingestion worker ----
+FROM node:20-alpine AS worker
+WORKDIR /app
+ENV NODE_ENV=production
+RUN addgroup -g 1001 -S nodejs && adduser -S worker -u 1001
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY tsconfig.json ./
+COPY scripts ./scripts
+COPY src ./src
+RUN mkdir -p /app/public/uploads && chown -R worker:nodejs /app
+USER worker
+CMD ["npm", "run", "worker"]
+
 # ---- run ----
 FROM node:20-alpine AS runner
 WORKDIR /app
