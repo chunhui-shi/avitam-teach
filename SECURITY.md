@@ -1,11 +1,11 @@
 # Security policy
 
 `avitam-teach` is an educational companion repository, not a supported hosted
-service or production reference architecture. Historical tags intentionally
-retain flaws and dependency versions discussed in the book. A clean test run
-does not establish that a checkpoint is safe to deploy today.
+service, deployment guide, or production reference architecture. Historical
+tags intentionally retain flaws and dependency versions discussed in the book.
+A clean test run does not establish deployment readiness.
 
-Before adapting any code for deployment:
+If you independently adapt any code for deployment:
 
 1. run a current dependency and container-image audit;
 2. upgrade affected packages and re-run the full verification suite;

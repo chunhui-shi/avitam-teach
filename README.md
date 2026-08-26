@@ -4,12 +4,10 @@
 Judgment When AI Writes the Code*. It is a small AI-generated teaching platform
 that evolves through a sequence of reviewable Git checkpoints.
 
-The project is evidence for the book, not a polished reference application. Its
-checkpoints intentionally preserve the code and dependency versions examined
-in the manuscript so readers can inspect, test, and repair the real system.
-Advisories continue to appear after a checkpoint is recorded. Do not deploy any
-tag or expose it to untrusted traffic without a fresh security review and
-dependency upgrade pass.
+The project is evidence for the book, not a polished reference application or a
+deployment guide. Its checkpoints preserve the code and dependency versions
+examined in the manuscript so readers can inspect, test, and repair the real
+system. No checkpoint is presented as production-ready.
 
 ## Repository map
 
@@ -36,6 +34,11 @@ Chapter 4 begins from the intermediate `v0.1-features` tag. That checkpoint adds
 instructor roles, profiles, avatar uploads, and lesson comments while retaining
 the untested baseline's correctness defects. The `*-pre-v0.1` tags preserve an
 earlier experimental arc and are not used by the book.
+
+The `v2-deployed` name marks the chapter that teaches delivery mechanics. It
+means that the repository gains production-shaped artifacts readers can study;
+it does not mean that this sample application was deployed or certified for a
+production environment.
 
 ## Start with the baseline
 
@@ -83,8 +86,8 @@ same lint, type-check, and test commands run in `.github/workflows/ci.yml`.
 ## Status
 
 `main` contains the `v4-designed` application plus repository documentation.
-The completed state has 34 passing tests. It is a teaching artifact rather than
-a hosted service, and no production deployment is provided.
+The completed state has 34 passing tests. It remains a teaching artifact, not a
+hosted service or a promise of deployment readiness.
 
 ## License
 
