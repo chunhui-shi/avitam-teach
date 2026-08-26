@@ -1,5 +1,10 @@
 # Generation Notes — run-4-claude-sonnet-minimal
 
+> **Historical record:** This file describes the selected generated baseline.
+> Later book checkpoints deliberately add tests, delivery infrastructure,
+> security controls, and design changes without rewriting this receipt. See the
+> repository-level `README.md` for the current checkpoint map.
+
 ## Schema
 
 Six tables in PostgreSQL 14:

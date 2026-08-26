@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# avitam-teach application
 
-## Getting Started
+This directory contains the Next.js application used as the running example in
+*Engineering Judgment When AI Writes the Code*. Start at the repository-level
+README for the book checkpoint map and safety warning.
 
-First, run the development server:
+## Requirements
+
+- Node.js 20 or later
+- PostgreSQL 14 or later
+- Docker and Docker Compose when following the Chapter 5 deployment path
+
+## Local development
+
+Install dependencies and create a local database:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+createdb avitam_teach
+psql avitam_teach < src/lib/schema.sql
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create `.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```dotenv
+DATABASE_URL=postgres://localhost/avitam_teach
+JWT_SECRET=replace-with-a-long-local-development-value
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The free course works without Stripe or Anthropic credentials. Add
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `ANTHROPIC_API_KEY` only when
+exercising those integrations.
 
-## Learn More
+Run the application with `npm run dev` and open <http://localhost:3000>.
 
-To learn more about Next.js, take a look at the following resources:
+## Verification
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The integration suite requires a throwaway PostgreSQL database. See
+`tests/README.md` for setup and coverage details.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run lint
+npx tsc --noEmit
+npm test
+npm run build
+```
 
-## Deploy on Vercel
+## Historical generation notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`GENERATION_NOTES.md` is the receipt for the selected AI generation run. It
+describes the original generated application, not every improvement present at
+the current tag.

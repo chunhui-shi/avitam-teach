@@ -1,7 +1,8 @@
 # Tests
 
-The suite added at `v1-tested` is the first real verification layer for the
-platform. These are **integration tests**: they run the actual route handlers
+The suite introduced at `v1-tested` is the first real verification layer for
+the platform. Later checkpoints extend it. These are primarily **integration
+tests**: they run the actual route handlers
 against a real PostgreSQL database, because the bugs that matter here only show
 up against real constraints and real concurrency.
 
@@ -32,8 +33,15 @@ suite runs, and every test starts from a truncated, freshly-seeded database.
 | File | Covers |
 |---|---|
 | `enrollments.test.ts` | Free-enroll happy path, idempotency, auth, paid-course rejection, and the **concurrency race** (the loser of a concurrent enroll must not 500). |
-| `lessons.test.ts` | The student lesson endpoint must not leak the **code reference solution**. One skipped test tracks the still-open quiz answer-key leak (fixing it means server-side grading). |
+| `lessons.test.ts` | The student lesson endpoint must not leak the **code reference solution** or quiz answer key. |
 | `comments.test.ts` | Business rules the feature pass already got right: empty comments rejected, a reply's parent must belong to the same lesson. |
+| `quiz-grade.test.ts` | Server-side quiz grading introduced at `v4-designed`. |
+| `rate-limit.test.ts` | Request limiting added for deployment-shaped operation. |
+| `sandbox.test.ts` | Out-of-process execution bounds and environment isolation. |
+| `image-validation.test.ts` | Uploaded avatar byte and size validation. |
+| `assistant.test.ts` | Assistant input boundaries and output redaction. |
+| `redact.test.ts` | Secret-shaped output redaction. |
 
-One test is intentionally `skip`ped — a known, deferred bug, kept visible in the
-suite rather than dropped.
+At `v1-tested`, one test is intentionally skipped to keep the quiz-answer leak
+visible until its design change. At `v4-designed`, server-side grading closes
+that gap and all 34 tests pass with no skips.
