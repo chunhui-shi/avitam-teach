@@ -1,12 +1,9 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Navbar } from '@/components/ui/Navbar';
 import { getSession } from '@/lib/auth';
 import { queryOne } from '@/lib/db';
 import { User } from '@/types';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Avitam Teach — Learn to Code',
@@ -42,7 +39,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body>
         <Navbar user={user} />
         <main className="min-h-screen bg-gray-50">
           {children}

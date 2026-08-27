@@ -155,9 +155,65 @@ CREATE INDEX IF NOT EXISTS idx_ingestion_jobs_claim
 -- Seed: sample courses
 INSERT INTO courses (slug, title, description, price_cents, published) VALUES
   ('intro-javascript', 'Introduction to JavaScript', 'Learn the fundamentals of JavaScript from scratch. Variables, functions, loops, and more.', 0, true),
+  ('basic-python', 'Basic Python', 'Learn Python values, control flow, functions, and collections through short examples.', 0, true),
   ('async-javascript', 'Async JavaScript', 'Master promises, async/await, fetch API, and event-driven programming.', 2900, true),
   ('node-backend', 'Node.js Backend Development', 'Build REST APIs with Node.js, Express, and PostgreSQL.', 4900, true)
 ON CONFLICT (slug) DO NOTHING;
+
+-- Free proof corpus for the optional cloud-staging exercise. The migration
+-- queues these published lessons for the same RAG pipeline used by uploads.
+INSERT INTO lessons (course_id, title, slug, position, content, lesson_type, code_starter, code_solution, code_language) VALUES
+  (
+    (SELECT id FROM courses WHERE slug = 'basic-python'),
+    'Values and Variables', 'python-values-and-variables', 1,
+    '## Values and Variables
+
+Python assigns a value to a name with `=`. A name can refer to a string, integer, floating-point number, Boolean, list, or another object.
+
+```python
+course = "Basic Python"
+lesson_count = 3
+published = True
+```
+
+Use `type(value)` to inspect the runtime type. Choose descriptive names and avoid replacing built-in names such as `list` or `str`.',
+    'text', NULL, NULL, 'python'
+  ),
+  (
+    (SELECT id FROM courses WHERE slug = 'basic-python'),
+    'Conditions and Loops', 'python-conditions-and-loops', 2,
+    '## Conditions and Loops
+
+An `if` statement selects a path from a Boolean condition. A `for` loop visits each item in an iterable.
+
+```python
+scores = [72, 88, 95]
+for score in scores:
+    if score >= 80:
+        print(score)
+```
+
+Indentation defines the block. Four spaces are the conventional indentation level.',
+    'text', NULL, NULL, 'python'
+  ),
+  (
+    (SELECT id FROM courses WHERE slug = 'basic-python'),
+    'Functions and Collections', 'python-functions-and-collections', 3,
+    '## Functions and Collections
+
+A function gives a name to reusable behavior. Parameters receive inputs, and `return` sends a result to the caller.
+
+```python
+def average(values):
+    return sum(values) / len(values)
+
+result = average([72, 88, 95])
+```
+
+Lists preserve order. Dictionaries associate keys with values. Validate empty input before dividing by `len(values)`.',
+    'text', NULL, NULL, 'python'
+  )
+ON CONFLICT DO NOTHING;
 
 -- Seed: sample lessons for intro-javascript
 INSERT INTO lessons (course_id, title, slug, position, content, lesson_type, code_starter, code_solution, code_language) VALUES
@@ -267,7 +323,7 @@ ON CONFLICT DO NOTHING;
 
 -- Seed quiz data for Functions lesson
 UPDATE lessons
-SET quiz_data = ''[
+SET quiz_data = '[
   {
     "id": "q1",
     "question": "Which keyword is used to define a function in JavaScript?",
@@ -277,7 +333,7 @@ SET quiz_data = ''[
   {
     "id": "q2",
     "question": "What does a function return if no return statement is given?",
-    "options": ["0", "null", "undefined", "''"],
+    "options": ["0", "null", "undefined", ""],
     "correct": 2
   },
   {
@@ -291,5 +347,5 @@ SET quiz_data = ''[
     ],
     "correct": 1
   }
-]''::jsonb
-WHERE slug = ''functions'';
+]'::jsonb
+WHERE slug = 'functions';

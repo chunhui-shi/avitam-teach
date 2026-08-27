@@ -7,12 +7,18 @@ vi.mock('@/lib/auth', async (orig) => {
 });
 
 import { getSession } from '@/lib/auth';
-import { GET } from '@/app/api/courses/[courseId]/lessons/[lessonId]/route';
+import { GET as getLessonRoute } from '@/app/api/courses/[courseId]/lessons/[lessonId]/route';
+import { GET as listLessonsRoute } from '@/app/api/courses/[courseId]/lessons/route';
 import { resetDb, seedCourse, seedLesson } from './helpers/db';
 
 const getLesson = (courseId: number, lessonId: number) =>
-  GET(new NextRequest('http://localhost/api/lesson'), {
+  getLessonRoute(new NextRequest('http://localhost/api/lesson'), {
     params: { courseId: String(courseId), lessonId: String(lessonId) },
+  });
+
+const listLessons = (courseId: number) =>
+  listLessonsRoute(new NextRequest('http://localhost/api/lessons'), {
+    params: { courseId: String(courseId) },
   });
 
 describe('GET /api/courses/[courseId]/lessons/[lessonId]', () => {
@@ -70,5 +76,31 @@ describe('GET /api/courses/[courseId]/lessons/[lessonId]', () => {
     // The questions and options may ship; the correct index must not.
     const serialized = JSON.stringify(payload.quiz_data ?? null);
     expect(serialized).not.toContain('"correct"');
+  });
+});
+
+describe('GET /api/courses/[courseId]/lessons', () => {
+  beforeEach(async () => {
+    await resetDb();
+    (getSession as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+  });
+
+  it('returns only the fields needed by the course outline', async () => {
+    const course = await seedCourse({ price_cents: 0 });
+    await seedLesson({
+      course_id: course.id,
+      lesson_type: 'code',
+      code_solution: 'const answer = 42;',
+    });
+
+    const response = await listLessons(course.id);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.lessons).toHaveLength(1);
+    expect(body.lessons[0]).not.toHaveProperty('content');
+    expect(body.lessons[0]).not.toHaveProperty('code_starter');
+    expect(body.lessons[0]).not.toHaveProperty('code_solution');
+    expect(body.lessons[0]).not.toHaveProperty('quiz_data');
   });
 });

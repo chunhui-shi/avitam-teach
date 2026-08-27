@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: avitam-teach-migration
+  namespace: avitam-teach
+  labels:
+    app.kubernetes.io/part-of: avitam-teach
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migration
+        azure.workload.identity/use: "true"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: avitam-teach
+      containers:
+        - name: migration
+          image: WORKER_IMAGE
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args: ["npm run db:init && npm run knowledge:backfill"]
+          envFrom:
+            - configMapRef:
+                name: avitam-teach-config
+            - secretRef:
+                name: avitam-teach-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi

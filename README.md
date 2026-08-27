@@ -46,6 +46,17 @@ cycle that tests whether the earlier design can absorb a substantial new
 requirement. Its RAG pipeline is driven by course-wide questions over uploaded
 teacher material, rather than added as an isolated demonstration.
 
+For a redistributable sample corpus, `sample-materials/python-official/`
+provides a checksum-pinned fetch script for the official Python tutorial and
+preserves its PSF license and attribution.
+
+`main` also carries an optional reader bonus and proof candidate: a standalone,
+one-node Azure Kubernetes Service staging topology, digest-pinned image
+workflow, migration gate, smoke test, rollback procedure, and teardown path.
+The `v6-cloud-staged` tag is deliberately withheld until a real environment has
+passed those checks. The exercise tests the cloud boundary; repository presence
+alone is not deployment evidence.
+
 ## Start with the baseline
 
 You need Node.js 20.16 or later and PostgreSQL. Stripe and Anthropic credentials
@@ -75,13 +86,13 @@ Then run `npm run dev` and open <http://localhost:3000>.
 The completed state uses integration tests against a real PostgreSQL database:
 
 ```bash
-git checkout v4-designed
+git checkout v5-evolved
 cd spine
 npm install
 docker run -d --name at-testpg \
   -e POSTGRES_PASSWORD=test \
   -e POSTGRES_DB=avitam_test \
-  -p 5432:5432 postgres:16-alpine
+  -p 5432:5432 pgvector/pgvector:pg16
 npm test
 docker rm -f at-testpg
 ```
@@ -91,9 +102,10 @@ same lint, type-check, and test commands run in `.github/workflows/ci.yml`.
 
 ## Status
 
-`main` contains the latest companion checkpoint plus repository documentation.
-The `v5-evolved` state has 47 passing tests. It remains a teaching artifact, not a
-hosted service or a promise of deployment readiness.
+`main` contains the latest verified companion checkpoint plus the unverified v6
+staging candidate. The `v5-evolved` state has 47 passing tests. The repository
+remains a teaching artifact, not a hosted service or a promise of deployment
+readiness.
 
 ## License
 

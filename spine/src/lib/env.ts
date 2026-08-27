@@ -4,7 +4,7 @@
 // than fall back to an insecure default. This is called from instrumentation.ts,
 // which Next.js runs once when the server boots.
 
-const REQUIRED = ['DATABASE_URL', 'JWT_SECRET'] as const;
+const REQUIRED = ['JWT_SECRET'] as const;
 
 // Missing optional vars disable a feature but are not fatal.
 const OPTIONAL = [
@@ -15,7 +15,18 @@ const OPTIONAL = [
 ] as const;
 
 export function validateEnv(): void {
-  const missing = REQUIRED.filter((name) => !process.env[name]?.trim());
+  const missing: string[] = REQUIRED.filter((name) => !process.env[name]?.trim());
+  if (!process.env.DATABASE_URL?.trim() && !process.env.PGHOST?.trim()) {
+    missing.push('DATABASE_URL or PGHOST');
+  }
+  if (process.env.STORAGE_DRIVER === 'azure') {
+    if (!process.env.AZURE_STORAGE_ACCOUNT_URL?.trim()) {
+      missing.push('AZURE_STORAGE_ACCOUNT_URL');
+    }
+    if (!process.env.AZURE_STORAGE_CONTAINER?.trim()) {
+      missing.push('AZURE_STORAGE_CONTAINER');
+    }
+  }
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variable(s): ${missing.join(', ')}. ` +

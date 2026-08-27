@@ -43,3 +43,26 @@ jobs:
       - run: npm run lint
       - run: npx tsc --noEmit
       - run: npm test
+
+  delivery-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-kubectl@v4
+      - name: Validate Azure deployment artifacts
+        run: |
+          bash -n infra/azure/staging.sh
+          kubectl create --dry-run=client --validate=false -f infra/azure/k8s/database.yaml -o yaml >/dev/null
+          sed -e 's|WEB_IMAGE|example.invalid/web@sha256:0000|g' \
+              -e 's|WORKER_IMAGE|example.invalid/worker@sha256:0000|g' \
+              infra/azure/k8s/workloads.yaml | \
+            kubectl create --dry-run=client --validate=false -f - -o yaml >/dev/null
+          sed -e 's|WORKER_IMAGE|example.invalid/worker@sha256:0000|g' \
+              infra/azure/k8s/migration-job.yaml | \
+            kubectl create --dry-run=client --validate=false -f - -o yaml >/dev/null
+      - name: Build web image
+        working-directory: spine
+        run: docker build --target runner -t avitam-teach-web:ci .
+      - name: Build worker image
+        working-directory: spine
+        run: docker build --target worker -t avitam-teach-worker:ci .

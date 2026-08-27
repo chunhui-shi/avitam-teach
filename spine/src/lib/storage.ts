@@ -1,5 +1,7 @@
 import { writeFile, readFile, unlink, mkdir } from 'fs/promises';
 import path from 'path';
+import { DefaultAzureCredential } from '@azure/identity';
+import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
 
 // v4-designed: a storage abstraction.
 //
@@ -50,28 +52,39 @@ class LocalDiskStorage implements BlobStorage {
   }
 }
 
-// The production implementation we'd swap in. Left unimplemented on purpose: the
-// point of the abstraction is that the avatar route does not change when this
-// does. A real version PUTs to an S3-compatible bucket and returns the CDN URL:
-//
-//   await s3.putObject({ Bucket, Key: key, Body: bytes, ContentType });
-//   return `${process.env.CDN_BASE}/${key}`;
-class ObjectStorage implements BlobStorage {
-  async save(): Promise<string> {
-    throw new Error('ObjectStorage is not configured in this build');
+// v6 bonus proof: the Azure implementation keeps the container private. Public
+// avatar reads pass through the bounded /api/assets/avatars route; course
+// material is readable only by the ingestion worker through this interface.
+class AzureBlobStorage implements BlobStorage {
+  private container(): ContainerClient {
+    const accountUrl = process.env.AZURE_STORAGE_ACCOUNT_URL;
+    const containerName = process.env.AZURE_STORAGE_CONTAINER;
+    if (!accountUrl || !containerName) {
+      throw new Error(
+        'AZURE_STORAGE_ACCOUNT_URL and AZURE_STORAGE_CONTAINER are required for Azure Blob Storage'
+      );
+    }
+    const service = new BlobServiceClient(accountUrl, new DefaultAzureCredential());
+    return service.getContainerClient(containerName);
   }
 
-  async read(): Promise<Buffer> {
-    throw new Error('ObjectStorage is not configured in this build');
+  async save(key: string, bytes: Buffer, contentType: string): Promise<string> {
+    const blob = this.container().getBlockBlobClient(key);
+    await blob.uploadData(bytes, { blobHTTPHeaders: { blobContentType: contentType } });
+    return `/api/assets/${key.split('/').map(encodeURIComponent).join('/')}`;
   }
 
-  async remove(): Promise<void> {
-    throw new Error('ObjectStorage is not configured in this build');
+  async read(key: string): Promise<Buffer> {
+    return Buffer.from(await this.container().getBlockBlobClient(key).downloadToBuffer());
+  }
+
+  async remove(key: string): Promise<void> {
+    await this.container().deleteBlob(key, { deleteSnapshots: 'include' });
   }
 }
 
 // One line decides which implementation the whole app uses.
 export const storage: BlobStorage =
-  process.env.STORAGE_DRIVER === 'object'
-    ? new ObjectStorage()
+  process.env.STORAGE_DRIVER === 'azure'
+    ? new AzureBlobStorage()
     : new LocalDiskStorage();

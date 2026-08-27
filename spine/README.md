@@ -10,6 +10,10 @@ README for the book checkpoint map and safety warning.
 - PostgreSQL 14 or later with the pgvector extension
 - Docker and Docker Compose when following the Chapter 5 deployment path
 
+The standalone Azure staging candidate is documented in
+[`docs/v6-cloud-staging-runbook.md`](../docs/v6-cloud-staging-runbook.md). Its
+presence does not mean the application has been deployed.
+
 ## Local development
 
 Install dependencies and create a local database:

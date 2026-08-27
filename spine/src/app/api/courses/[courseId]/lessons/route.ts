@@ -3,6 +3,11 @@ import { query, queryOne } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { Lesson, Enrollment } from '@/types';
 
+type LessonSummary = Pick<
+  Lesson,
+  'id' | 'course_id' | 'title' | 'slug' | 'position' | 'lesson_type' | 'created_at'
+> & { completed?: boolean };
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { courseId: string } }
@@ -38,18 +43,22 @@ export async function GET(
       }
     }
 
-    let lessons: Lesson[];
+    // This endpoint feeds the course outline. It needs navigation metadata,
+    // not lesson bodies, quiz keys, starter code, or reference solutions.
+    let lessons: LessonSummary[];
     if (session) {
-      lessons = await query<Lesson>(`
-        SELECT l.*, lp.completed
+      lessons = await query<LessonSummary>(`
+        SELECT l.id, l.course_id, l.title, l.slug, l.position,
+               l.lesson_type, l.created_at, lp.completed
         FROM lessons l
         LEFT JOIN lesson_progress lp ON lp.lesson_id = l.id AND lp.user_id = $1
         WHERE l.course_id = $2
         ORDER BY l.position
       `, [session.userId, courseId]);
     } else {
-      lessons = await query<Lesson>(
-        'SELECT * FROM lessons WHERE course_id = $1 ORDER BY position',
+      lessons = await query<LessonSummary>(
+        `SELECT id, course_id, title, slug, position, lesson_type, created_at
+         FROM lessons WHERE course_id = $1 ORDER BY position`,
         [courseId]
       );
     }

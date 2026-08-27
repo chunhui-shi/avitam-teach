@@ -22,9 +22,9 @@ RUN addgroup -g 1001 -S nodejs && adduser -S worker -u 1001
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY tsconfig.json ./
-COPY scripts ./scripts
-COPY src ./src
-RUN mkdir -p /app/public/uploads && chown -R worker:nodejs /app
+COPY --chown=worker:nodejs scripts ./scripts
+COPY --chown=worker:nodejs src ./src
+RUN mkdir -p /app/public/uploads && chown worker:nodejs /app/public/uploads
 USER worker
 CMD ["npm", "run", "worker"]
 
